@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CADERNO DE ESTUDOS</title>
+    <style>
+        :root { 
+            --azul: #1e3a8a; --vermelho: #e11d48; --laranja: #f59e0b;
+            --verde: #15803d; --cinza: #f4f6f8; 
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--cinza); margin: 0; padding-bottom: 50px; }
+        header { background: var(--azul); color: white; text-align: center; padding: 20px; border-bottom: 5px solid var(--vermelho); }
+        .container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        
+        /* Estilos do Menu de Matérias */
+        .menu-materias { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+        .btn-materia { 
+            background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid white; 
+            padding: 8px 15px; border-radius: 20px; cursor: pointer; text-decoration: none; 
+            font-size: 13px; transition: 0.3s; font-weight: bold;
+        }
+        .btn-materia:hover { background: white; color: var(--azul); }
+
+        .form-box { background: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .form-box h3 { margin-top: 0; color: var(--azul); }
+        .form-box input { width: 100%; margin-bottom: 10px; padding: 10px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
+        .form-box button { width: 100%; background: var(--azul); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        
+        .titulo-assunto { grid-column: 1/-1; font-size: 1.2rem; font-weight: bold; margin-top: 30px; color: var(--azul); border-left: 5px solid var(--vermelho); padding-left: 10px; }
+        
+        .card-container { height: 260px; perspective: 1000px; position: relative; }
+        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
+        .flipped { transform: rotateY(180deg); }
+        
+        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 15px; padding: 20px; box-sizing: border-box; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .front { border-top: 6px solid var(--azul); }
+        .back { transform: rotateY(180deg); border-top: 6px solid var(--verde); }
+        
+        .btn-excluir { 
+            position: absolute; top: 10px; right: 10px; 
+            background: rgba(0, 0, 0, 0.05); color: #999; border: none; 
+            border-radius: 50%; width: 24px; height: 24px; cursor: pointer; 
+            z-index: 30; font-size: 12px; display: flex; align-items: center; justify-content: center;
+        }
+        .btn-excluir:hover { background: var(--vermelho); color: white; }
+
+        .status { font-size: 11px; color: #666; margin-bottom: 10px; }
+        .pergunta, .resposta { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 1.1rem; font-weight: 350; }
+        
+        .btn-group { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+        .btn-group button { border: none; padding: 10px 2px; border-radius: 5px; font-size: 10px; font-weight: bold; cursor: pointer; color: white; }
+        
+        #loading { text-align: center; color: var(--azul); font-weight: bold; padding: 20px; display: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>CADERNO DE ESTUDOS</h1>
+    <p id="infoPagina">Carregando...</p>
+    
+    <div class="menu-materias">
+        <a href="?" class="btn-materia">Geral</a>
+        <a href="?materia=Penal" class="btn-materia">Penal</a>
+	<a href="?materia=P. Penal" class="btn-materia">P.Penal</a>
+        <a href="?materia=Constitucional" class="btn-materia">Constitucional</a>
+        <a href="?materia=Administrativo" class="btn-materia">Adm</a>
+        <a href="?materia=Legislacao" class="btn-materia">Legislação Extravagente</a>
+    </div>
+</header>
+
+<div class="container">
+    <div class="form-box">
+        <h3>Novo Cartão</h3>
+        <input type="text" id="novoAssunto" placeholder="Tópico (ex: Teoria do Crime)">
+        <input type="text" id="novaPergunta" placeholder="Pergunta">
+        <input type="text" id="novaResposta" placeholder="Resposta">
+        <button id="btnAdicionar">Salvar na Nuvem</button>
+    </div>
+
+    <div id="loading">Sincronizando com banco de dados...</div>
+    <div class="grid" id="flashcards"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // --- LÓGICA DE SELEÇÃO DINÂMICA DE MATÉRIA ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const materiaParam = urlParams.get('materia');
+    const NOME_DA_COLECAO = materiaParam ? `cards_${materiaParam}` : "cards_linha74"; 
+    
+    document.getElementById('infoPagina').innerText = "Matéria: " + (materiaParam || "Geral (Linha 74)");
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBp8ohUWxJl2s2-gZvKhTtDL1fpTyCJZSU",
+      authDomain: "mycardspro-4a537.firebaseapp.com",
+      projectId: "mycardspro-4a537",
+      storageBucket: "mycardspro-4a537.firebasestorage.app",
+      messagingSenderId: "503442081400",
+      appId: "1:503442081400:web:8f019b4b4c9656cb9dcf8d"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const W = [1, 3, 5, 12, 4.9, 0.9, 0.8, 0.01, 1.5, 0.1, 0.9, 2.1, 0.05, 0.3, 1.2, 0.2, 2.6];
+    const CORES = { 1: "var(--vermelho)", 2: "var(--laranja)", 3: "var(--azul)", 4: "var(--verde)" };
+
+    function calcularFSRS(dados, nota) {
+        let s = dados.stability || 0;
+        let d = dados.difficulty || 0;
+        const agora = new Date();
+        const ultima = dados.lastReview ? new Date(dados.lastReview) : agora;
+        const diasPassados = Math.max(0, (agora - ultima) / (1000 * 60 * 60 * 24));
+
+        if (dados.repetition === 0 || s === 0) {
+            s = W[nota - 1];
+            d = W[4] - (nota - 3) * W[5];
+        } else {
+            const retrievability = Math.pow(1 + (1 / 9) * (diasPassados / s), -1);
+            d = Math.min(Math.max(d - W[6] * (nota - 3), 1), 10);
+            if (nota === 1) {
+                s = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp(W[14] * (1 - retrievability));
+            } else {
+                const fator = Math.exp(W[8]) * (11 - d) * Math.pow(s, -W[9]) * (Math.exp(W[10] * (1 - retrievability)) - 1);
+                s = s * (1 + fator);
+            }
+        }
+        let intervalo = nota === 1 ? 0 : Math.round(s);
+        const dataDue = new Date();
+        dataDue.setDate(dataDue.getDate() + intervalo);
+        return { 
+            stability: s, difficulty: d, repetition: (dados.repetition || 0) + 1, 
+            lastReview: agora.toISOString(), interval: intervalo, dueDate: dataDue.toISOString(),
+            statusColor: CORES[nota]
+        };
+    }
+
+    async function carregarCards() {
+        const container = document.getElementById("flashcards");
+        const loader = document.getElementById("loading");
+        loader.style.display = "block";
+
+        try {
+            const q = query(collection(db, NOME_DA_COLECAO), orderBy("assunto"));
+            const querySnapshot = await getDocs(q);
+            container.innerHTML = "";
+            let ultimoAssunto = "";
+
+            querySnapshot.forEach((docSnap) => {
+                const item = docSnap.data();
+                const id = docSnap.id;
+
+                if (item.assunto !== ultimoAssunto) {
+                    const titulo = document.createElement("div");
+                    titulo.className = "titulo-assunto";
+                    titulo.innerText = item.assunto || "Geral";
+                    container.appendChild(titulo);
+                    ultimoAssunto = item.assunto;
+                }
+
+                const cardDiv = document.createElement("div");
+                cardDiv.className = "card-container";
+                cardDiv.innerHTML = `
+                    <div class="card-inner" onclick="this.classList.toggle('flipped')">
+                        <div class="face front">
+                            <button class="btn-excluir" onclick="event.stopPropagation(); window.excluir('${id}')">✕</button>
+                            <div class="status" style="color:${item.statusColor || '#666'}">
+                                <b>Próxima:</b> ${new Date(item.dueDate).toLocaleDateString()}<br>
+                                <b>Intervalo:</b> +${item.interval || 0} dias
+                            </div>
+                            <div class="pergunta">${item.pergunta}</div>
+                        </div>
+                        <div class="face back">
+                            <button class="btn-excluir" onclick="event.stopPropagation(); window.excluir('${id}')">✕</button>
+                            <div class="resposta">${item.resposta}</div>
+                            <div class="btn-group">
+                                <button style="background:var(--vermelho)" onclick="event.stopPropagation(); window.responder('${id}', 1)">Errei</button>
+                                <button style="background:var(--laranja)" onclick="event.stopPropagation(); window.responder('${id}', 2)">Difícil</button>
+                                <button style="background:var(--azul)" onclick="event.stopPropagation(); window.responder('${id}', 3)">Bom</button>
+                                <button style="background:var(--verde)" onclick="event.stopPropagation(); window.responder('${id}', 4)">Fácil</button>
+                            </div>
+                        </div>
+                    </div>`;
+                container.appendChild(cardDiv);
+            });
+        } catch (e) { console.error(e); }
+        loader.style.display = "none";
+    }
+
+    window.responder = async (id, nota) => {
+        const docRef = doc(db, NOME_DA_COLECAO, id);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            await updateDoc(docRef, calcularFSRS(snap.data(), nota));
+            carregarCards();
+        }
+    };
+
+    window.excluir = async (id) => {
+        if (confirm("Deseja excluir este card?")) {
+            await deleteDoc(doc(db, NOME_DA_COLECAO, id));
+            carregarCards();
+        }
+    };
+
+    document.getElementById("btnAdicionar").onclick = async () => {
+        const ass = document.getElementById("novoAssunto").value.trim();
+        const p = document.getElementById("novaPergunta").value.trim();
+        const r = document.getElementById("novaResposta").value.trim();
+        if (!p || !r) return alert("Preencha pergunta e resposta!");
+
+        await addDoc(collection(db, NOME_DA_COLECAO), {
+            assunto: ass || "Geral",
+            pergunta: p, resposta: r, repetition: 0, stability: 0, difficulty: 0,
+            lastReview: null, dueDate: new Date().toISOString(), interval: 0, statusColor: "#666"
+        });
+
+        document.getElementById("novaPergunta").value = "";
+        document.getElementById("novaResposta").value = "";
+        carregarCards();
+    };
+
+    carregarCards();
+</script>
+</body>
+</html>
