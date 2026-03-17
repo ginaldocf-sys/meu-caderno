@@ -28,6 +28,14 @@
         .form-box input { width: 100%; margin-bottom: 10px; padding: 10px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
         .form-box button { width: 100%; background: var(--azul); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         
+        /* Estilo do Botão de Backup Discreto */
+        .btn-backup-discreto { 
+            background: transparent !important; color: #888 !important; border: 1px solid #ddd !important; 
+            margin-top: 15px; padding: 5px !important; font-size: 11px !important; font-weight: normal !important;
+            width: auto !important; display: block; margin-left: auto; margin-right: auto;
+        }
+        .btn-backup-discreto:hover { color: var(--azul) !important; border-color: var(--azul) !important; }
+
         .titulo-assunto { grid-column: 1/-1; font-size: 1.2rem; font-weight: bold; margin-top: 30px; color: var(--azul); border-left: 5px solid var(--vermelho); padding-left: 10px; }
         
         .card-container { height: 260px; perspective: 1000px; position: relative; }
@@ -64,7 +72,7 @@
     <div class="menu-materias">
         <a href="?" class="btn-materia">Geral</a>
         <a href="?materia=Penal" class="btn-materia">Penal</a>
-	<a href="?materia=P. Penal" class="btn-materia">P.Penal</a>
+        <a href="?materia=P. Penal" class="btn-materia">P.Penal</a>
         <a href="?materia=Constitucional" class="btn-materia">Constitucional</a>
         <a href="?materia=Administrativo" class="btn-materia">Adm</a>
         <a href="?materia=Legislacao" class="btn-materia">Legislação Extravagente</a>
@@ -78,6 +86,7 @@
         <input type="text" id="novaPergunta" placeholder="Pergunta">
         <input type="text" id="novaResposta" placeholder="Resposta">
         <button id="btnAdicionar">Salvar na Nuvem</button>
+        <button id="btnBackup" class="btn-backup-discreto">Fazer backup desta matéria (JSON)</button>
     </div>
 
     <div id="loading">Sincronizando com banco de dados...</div>
@@ -205,6 +214,21 @@
             await deleteDoc(doc(db, NOME_DA_COLECAO, id));
             carregarCards();
         }
+    };
+
+    // Lógica do botão de backup
+    document.getElementById("btnBackup").onclick = async () => {
+        const q = query(collection(db, NOME_DA_COLECAO));
+        const snap = await getDocs(q);
+        const dados = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (dados.length === 0) return alert("Nada para salvar.");
+        
+        const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `backup_${NOME_DA_COLECAO}.json`;
+        link.click();
     };
 
     document.getElementById("btnAdicionar").onclick = async () => {
