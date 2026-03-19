@@ -14,28 +14,23 @@
         .container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         
-        /* Estilos do Menu de Matérias */
-        .menu-materias { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+        .menu-materias { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 15px; align-items: center; }
         .btn-materia { 
             background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid white; 
             padding: 8px 15px; border-radius: 20px; cursor: pointer; text-decoration: none; 
-            font-size: 13px; transition: 0.3s; font-weight: bold;
+            font-size: 13px; transition: 0.3s; font-weight: bold; text-transform: capitalize;
         }
         .btn-materia:hover { background: white; color: var(--azul); }
+
+        .add-materia-box { display: flex; gap: 5px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 20px; margin-left: 10px; }
+        .add-materia-box input { border: none; border-radius: 15px; padding: 5px 10px; font-size: 12px; width: 110px; outline: none; }
+        .add-materia-box button { background: var(--verde); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-weight: bold; }
 
         .form-box { background: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .form-box h3 { margin-top: 0; color: var(--azul); }
         .form-box input { width: 100%; margin-bottom: 10px; padding: 10px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
         .form-box button { width: 100%; background: var(--azul); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         
-        /* Estilo do Botão de Backup Discreto */
-        .btn-backup-discreto { 
-            background: transparent !important; color: #888 !important; border: 1px solid #ddd !important; 
-            margin-top: 15px; padding: 5px !important; font-size: 11px !important; font-weight: normal !important;
-            width: auto !important; display: block; margin-left: auto; margin-right: auto;
-        }
-        .btn-backup-discreto:hover { color: var(--azul) !important; border-color: var(--azul) !important; }
-
         .titulo-assunto { grid-column: 1/-1; font-size: 1.2rem; font-weight: bold; margin-top: 30px; color: var(--azul); border-left: 5px solid var(--vermelho); padding-left: 10px; }
         
         .card-container { height: 260px; perspective: 1000px; position: relative; }
@@ -69,14 +64,8 @@
     <h1>CADERNO DE ESTUDOS</h1>
     <p id="infoPagina">Carregando...</p>
     
-    <div class="menu-materias">
-        <a href="?" class="btn-materia">Geral</a>
-        <a href="?materia=Penal" class="btn-materia">Penal</a>
-        <a href="?materia=P. Penal" class="btn-materia">P.Penal</a>
-        <a href="?materia=Constitucional" class="btn-materia">Constitucional</a>
-        <a href="?materia=Administrativo" class="btn-materia">Adm</a>
-        <a href="?materia=Legislacao" class="btn-materia">Legislação Extravagente</a>
-    </div>
+    <div class="menu-materias" id="menuMaterias">
+        </div>
 </header>
 
 <div class="container">
@@ -86,7 +75,6 @@
         <input type="text" id="novaPergunta" placeholder="Pergunta">
         <input type="text" id="novaResposta" placeholder="Resposta">
         <button id="btnAdicionar">Salvar na Nuvem</button>
-        <button id="btnBackup" class="btn-backup-discreto">Fazer backup desta matéria (JSON)</button>
     </div>
 
     <div id="loading">Sincronizando com banco de dados...</div>
@@ -97,12 +85,66 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // --- LÓGICA DE SELEÇÃO DINÂMICA DE MATÉRIA ---
+    // --- CONFIGURAÇÃO E PADRONIZAÇÃO ---
     const urlParams = new URLSearchParams(window.location.search);
     const materiaParam = urlParams.get('materia');
-    const NOME_DA_COLECAO = materiaParam ? `cards_${materiaParam}` : "cards_linha74"; 
+    
+    // Forçamos minúsculas no nome da coleção do Firebase para evitar duplicidade
+    const NOME_DA_COLECAO = materiaParam ? `cards_${materiaParam.toLowerCase().trim()}` : "cards_linha74"; 
     
     document.getElementById('infoPagina').innerText = "Matéria: " + (materiaParam || "Geral (Linha 74)");
+
+    const materiasPadrao = [
+        { nome: "Geral", link: "?" },
+        { nome: "Penal", link: "?materia=penal" },
+        { nome: "P.Penal", link: "?materia=p.penal" },
+        { nome: "Constitucional", link: "?materia=constitucional" },
+        { nome: "Adm", link: "?materia=administrativo" },
+        { nome: "Legislação Extravagante", link: "?materia=legislacao" }
+    ];
+
+    let materiasCustom = JSON.parse(localStorage.getItem('materias_custom')) || [];
+
+    function renderizarMenu() {
+        const menu = document.getElementById('menuMaterias');
+        menu.innerHTML = '';
+        
+        materiasPadrao.forEach(m => {
+            const a = document.createElement('a');
+            a.href = m.link;
+            a.className = 'btn-materia';
+            a.innerText = m.nome;
+            menu.appendChild(a);
+        });
+
+        materiasCustom.forEach(m => {
+            const a = document.createElement('a');
+            a.href = `?materia=${m.toLowerCase()}`;
+            a.className = 'btn-materia';
+            a.innerText = m;
+            menu.appendChild(a);
+        });
+
+        const divAdd = document.createElement('div');
+        divAdd.className = 'add-materia-box';
+        divAdd.innerHTML = `
+            <input type="text" id="inputNovaMateria" placeholder="Nova disciplina...">
+            <button id="btnNovaMateria">+</button>
+        `;
+        menu.appendChild(divAdd);
+
+        document.getElementById('btnNovaMateria').onclick = () => {
+            let nome = document.getElementById('inputNovaMateria').value.trim();
+            // Salva como minúscula para garantir consistência entre dispositivos
+            if(nome && !materiasCustom.includes(nome.toLowerCase())) {
+                materiasCustom.push(nome.toLowerCase());
+                localStorage.setItem('materias_custom', JSON.stringify(materiasCustom));
+                renderizarMenu();
+            }
+        };
+    }
+
+    renderizarMenu();
 
     const firebaseConfig = {
       apiKey: "AIzaSyBp8ohUWxJl2s2-gZvKhTtDL1fpTyCJZSU",
@@ -214,21 +256,6 @@
             await deleteDoc(doc(db, NOME_DA_COLECAO, id));
             carregarCards();
         }
-    };
-
-    // Lógica do botão de backup
-    document.getElementById("btnBackup").onclick = async () => {
-        const q = query(collection(db, NOME_DA_COLECAO));
-        const snap = await getDocs(q);
-        const dados = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (dados.length === 0) return alert("Nada para salvar.");
-        
-        const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `backup_${NOME_DA_COLECAO}.json`;
-        link.click();
     };
 
     document.getElementById("btnAdicionar").onclick = async () => {
