@@ -92,7 +92,7 @@
     // Forçamos minúsculas no nome da coleção do Firebase para evitar duplicidade
     const NOME_DA_COLECAO = materiaParam ? `cards_${materiaParam.toLowerCase().trim()}` : "cards_linha74"; 
     
-    document.getElementById('infoPagina').innerText = "Matéria: " + (materiaParam || "Geral (Linha 74)");
+    document.getElementById('infoPagina').innerText = "Matéria: " + (materiaParam || "Geral");
 
     const materiasPadrao = [
         { nome: "Geral", link: "?" },
@@ -128,7 +128,7 @@
         const divAdd = document.createElement('div');
         divAdd.className = 'add-materia-box';
         divAdd.innerHTML = `
-            <input type="text" id="inputNovaMateria" placeholder="Nova disciplina...">
+            <input type="text" id="inputNovaMateria" placeholder="Add disciplina...">
             <button id="btnNovaMateria">+</button>
         `;
         menu.appendChild(divAdd);
