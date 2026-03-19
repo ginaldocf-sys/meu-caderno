@@ -18,7 +18,7 @@
         .btn-materia { 
             background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid white; 
             padding: 8px 15px; border-radius: 20px; cursor: pointer; text-decoration: none; 
-            font-size: 13px; transition: 0.3s; font-weight: bold; text-transform: capitalize;
+            font-size: 13px; transition: 0.3s; font-weight: bold;
         }
         .btn-materia:hover { background: white; color: var(--azul); }
 
@@ -63,9 +63,7 @@
 <header>
     <h1>CADERNO DE ESTUDOS</h1>
     <p id="infoPagina">Carregando...</p>
-    
-    <div class="menu-materias" id="menuMaterias">
-        </div>
+    <div class="menu-materias" id="menuMaterias"></div>
 </header>
 
 <div class="container">
@@ -85,12 +83,11 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // --- CONFIGURAÇÃO E PADRONIZAÇÃO ---
     const urlParams = new URLSearchParams(window.location.search);
     const materiaParam = urlParams.get('materia');
     
-    // Forçamos minúsculas no nome da coleção do Firebase para evitar duplicidade
-    const NOME_DA_COLECAO = materiaParam ? `cards_${materiaParam.toLowerCase().trim()}` : "cards_linha74"; 
+    // IMPORTANTE: Aqui ele respeita o nome exato da URL para não perder cards_Penal
+    const NOME_DA_COLECAO = materiaParam ? `cards_${materiaParam.trim()}` : "cards_linha74"; 
     
     document.getElementById('infoPagina').innerText = "Matéria: " + (materiaParam || "Geral");
 
@@ -119,7 +116,7 @@
 
         materiasCustom.forEach(m => {
             const a = document.createElement('a');
-            a.href = `?materia=${m.toLowerCase()}`;
+            a.href = `?materia=${m}`;
             a.className = 'btn-materia';
             a.innerText = m;
             menu.appendChild(a);
@@ -129,15 +126,14 @@
         divAdd.className = 'add-materia-box';
         divAdd.innerHTML = `
             <input type="text" id="inputNovaMateria" placeholder="Add disciplina...">
-            <button id="btnNovaMateria">+</button>
+            <button id="btnNovaMateria" style="background: var(--verde); color: white;">+</button>
         `;
         menu.appendChild(divAdd);
 
         document.getElementById('btnNovaMateria').onclick = () => {
             let nome = document.getElementById('inputNovaMateria').value.trim();
-            // Salva como minúscula para garantir consistência entre dispositivos
-            if(nome && !materiasCustom.includes(nome.toLowerCase())) {
-                materiasCustom.push(nome.toLowerCase());
+            if(nome && !materiasCustom.includes(nome)) {
+                materiasCustom.push(nome);
                 localStorage.setItem('materias_custom', JSON.stringify(materiasCustom));
                 renderizarMenu();
             }
